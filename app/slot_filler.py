@@ -86,7 +86,8 @@ class ExtractedSlots:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary (excluding None values)"""
         result = {}
-        for key, value in asdict(self).items():
+        for key in self.__dataclass_fields__:
+            value = getattr(self, key)
             if value is not None:
                 if isinstance(value, TimeRange):
                     result[key] = {
@@ -145,18 +146,19 @@ class SlotExtractor:
 
     # App name patterns (ordered by specificity)
     APP_PATTERNS = [
-        # Explicit "app" keyword patterns
+        # Explicit "app" keyword patterns (highest priority)
         r'(?:for|of|about)\s+app(?:lication)?\s+["\']?([a-zA-Z][\w\-/]+)["\']?',
         r'app(?:lication)?\s+["\']?([a-zA-Z][\w\-/]+)["\']?',
 
-        # App name before time expressions (most common)
+        # App name before time expressions (high priority)
         r'(?:for|of|about)\s+([a-zA-Z][\w\-/]+)\s+(?:app\s+)?(?:in\s+the\s+(?:last|past)|over\s+the)',
 
-        # App name in deployment/test context
-        r'([a-zA-Z][\w\-/]+)\s+(?:deployment|test|release|build)s?',
-
-        # Quoted app names
+        # Quoted app names (high priority)
         r'["\']([a-zA-Z][\w\-/]+)["\']',
+
+        # App name in deployment/test context (medium priority)
+        # Only match if preceded by preposition to avoid catching verbs
+        r'(?:for|of)\s+([a-zA-Z][\w\-/]+)\s+(?:deployment|test|release|build)s?',
 
         # Generic prepositional patterns (lowest priority)
         r'(?:for|of|about)\s+([a-zA-Z][\w\-/]+)(?:\s+(?:to|in|on))?',
@@ -193,6 +195,11 @@ class SlotExtractor:
         self._time_word_blocklist = {
             'the', 'last', 'past', 'previous', 'next', 'this', 'that',
             'in', 'for', 'of', 'to', 'about', 'day', 'week', 'month', 'year'
+        }
+        # Block common SQL/query operation words
+        self._operation_word_blocklist = {
+            'list', 'show', 'get', 'find', 'display', 'count', 'select',
+            'what', 'how', 'many', 'give', 'me', 'the'
         }
 
     def extract(self, query: str) -> ExtractedSlots:
@@ -491,45 +498,55 @@ def validate_slots(slots: ExtractedSlots,
 
 # Example usage and tests
 if __name__ == "__main__":
-    # Test queries
-    test_queries = [
-        "What's the last deployed version to prod of user-service",
-        "Show me deployments for frontend in the last week",
-        "How many tests ran for api-gateway this week",
-        "Get the latest 5 deployments for auth-service in dev",
-        "What about backend app deployments in the last 30 days?",
-        "Show 10 deployments to staging",
-        "frontend/api deployments over the last 3 months",
-        "Give me test results for user-service from yesterday",
-        "List deployments on 2024-01-15",
-    ]
+    import argparse
 
-    # Initialize with known apps
-    known_apps = ['user-service', 'api-gateway',
-                  'auth-service', 'frontend', 'backend']
+    parser = argparse.ArgumentParser(description='Slot Filler for NL2SQL')
+    parser.add_argument('--test', action='store_true',
+                        help='Run test extractions')
+    args = parser.parse_args()
 
-    print("=" * 80)
-    print("SLOT EXTRACTION RESULTS")
-    print("=" * 80)
+    if args.test:
+        # Test queries
+        test_queries = [
+            "What's the last deployed version to prod of user-service",
+            "Show me deployments for frontend in the last week",
+            "How many tests ran for api-gateway this week",
+            "Get the latest 5 deployments for auth-service in dev",
+            "What about backend app deployments in the last 30 days?",
+            "Show 10 deployments to staging",
+            "frontend/api deployments over the last 3 months",
+            "Give me test results for user-service from yesterday",
+            "List deployments on 2024-01-15",
+        ]
 
-    for query in test_queries:
-        slots = extract_slots(query, known_apps=known_apps)
-        validation = validate_slots(slots, valid_apps=known_apps,
-                                    valid_envs=['PROD', 'STAGING', 'DEV', 'QA'])
+        # Initialize with known apps
+        known_apps = ['user-service', 'api-gateway',
+                      'auth-service', 'frontend', 'backend']
 
-        print(f"\nQuery: {query}")
-        print(f"  App: {slots.app_name}")
-        print(f"  Env: {slots.environment}")
-        if slots.time_range:
-            print(
-                f"  Time: {slots.time_range.value} {slots.time_range.unit.value}")
-            print(f"    → SQL: {slots.time_range.to_sql_filter()}")
-        print(f"  Date: {slots.specific_date}")
-        print(f"  Limit: {slots.limit}")
-        print(f"  Table: {slots.table_hint}")
-        print(f"  Operation: {slots.operation_type}")
-        print(f"  Confidence: {slots.confidence}")
-        print(f"  Cache Key: {slots.to_cache_key()}")
+        print("=" * 80)
+        print("SLOT EXTRACTION RESULTS")
+        print("=" * 80)
 
-        if validation["warnings"]:
-            print(f"  ⚠ Warnings: {', '.join(validation['warnings'])}")
+        for query in test_queries:
+            slots = extract_slots(query, known_apps=known_apps)
+            validation = validate_slots(slots, valid_apps=known_apps,
+                                        valid_envs=['PROD', 'STAGING', 'DEV', 'QA'])
+
+            print(f"\nQuery: {query}")
+            print(f"  App: {slots.app_name}")
+            print(f"  Env: {slots.environment}")
+            if slots.time_range:
+                print(
+                    f"  Time: {slots.time_range.value} {slots.time_range.unit.value}")
+                print(f"    → SQL: {slots.time_range.to_sql_filter()}")
+            print(f"  Date: {slots.specific_date}")
+            print(f"  Limit: {slots.limit}")
+            print(f"  Table: {slots.table_hint}")
+            print(f"  Operation: {slots.operation_type}")
+            print(f"  Confidence: {slots.confidence}")
+            print(f"  Cache Key: {slots.to_cache_key()}")
+
+            if validation["warnings"]:
+                print(f"  ⚠ Warnings: {', '.join(validation['warnings'])}")
+    else:
+        print("Slot Filler module loaded. Use --test flag to run test extractions.")
