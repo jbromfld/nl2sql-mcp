@@ -1,0 +1,16 @@
+{
+    "mcpServers": {
+        "cicd-queries": {
+            "command": "python",
+            "args": [
+                "/path/to/your/mcp_server.py"
+            ],
+            "env": {
+                "NL2SQL_PREPARE_URL": "https://your-api-server.com/prepare",
+                "NL2SQL_EXECUTE_URL": "https://your-api-server.com/execute",
+                "NL2SQL_TIMEOUT": "30",
+                "USER_ID": "your.email@company.com"
+            }
+        }
+    }
+}
