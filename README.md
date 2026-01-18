@@ -2,6 +2,9 @@
 
 Natural Language to SQL conversion tool with intelligent caching, exposed via Model Context Protocol (MCP).
 
+
+
+
 ## 🎯 What Is This?
 
 A specialized MCP server that converts natural language questions into SQL queries against your CI/CD database. It features:
