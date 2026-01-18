@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 8088
 
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8088", "api_server:app"]
+CMD ["uvicorn", "app.api_server:app", "--host", "0.0.0.0", "--port", "8088"]

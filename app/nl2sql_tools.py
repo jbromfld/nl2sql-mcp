@@ -16,7 +16,7 @@ from datetime import datetime
 from contextlib import contextmanager
 
 # Import the slot filler (assuming it's in the same package)
-from slot_filler import extract_slots, validate_slots, ExtractedSlots, TimeRange
+from app.slot_filler import extract_slots, validate_slots, ExtractedSlots, TimeRange
 
 
 class PostgreSQLCache:

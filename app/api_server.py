@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 # Import the NL2SQL tools
-from nl2sql_tools import NL2SQLTools
+from app.nl2sql_tools import NL2SQLTools
 
 load_dotenv()
 
