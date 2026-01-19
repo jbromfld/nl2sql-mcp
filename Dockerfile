@@ -11,7 +11,6 @@ ENV PIP_NO_WARN_SCRIPT_LOCATION=1
 WORKDIR /app
 
 # Install system dependencies if needed
-# (psycopg2-binary doesn't need libpq-dev, but include if you switch to psycopg2)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
@@ -36,7 +35,7 @@ USER appuser
 # Expose port
 EXPOSE 8088
 
-# Health check (optional)
+# Health check
 HEALTHCHECK --interval=360s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8088/health')" || exit 1
 
