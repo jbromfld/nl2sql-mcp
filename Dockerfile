@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Prevent debconf warnings during build
+# Prevent debconf and pip warnings during build
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_NO_CACHE_DIR=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
