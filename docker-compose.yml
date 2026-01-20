@@ -1,6 +1,7 @@
 services:
-  api:
+  nl2sql-service:
     build: .
+    container_name: nl2sql-service
     ports:
       - "8088:8088"
     environment:

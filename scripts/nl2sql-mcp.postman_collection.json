@@ -1,0 +1,196 @@
+{
+  "info": {
+    "_postman_id": "fff35986-de44-453c-b6a5-e5127fb94982",
+    "name": "nl2sql-mcp",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "14508807"
+  },
+  "item": [
+    {
+      "name": "health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseURL}}/health",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "cache stats",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseURL}}/cache/stats",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "cache",
+            "stats"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "cache queries",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseURL}}/cache/list?limit=10",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "cache",
+            "list"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "cache clear",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"days_old\": 90\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseURL}}/cache/cleanup",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "cache",
+            "cleanup"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "prepare",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"query\": \"Show me failed tests for frontend in the last week\",\n    \"user_id\": \"jim@example.com\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseURL}}/prepare",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "prepare"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "execute",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"sql\": \"SELECT * FROM deployment_data WHERE app_name = \\\"frontend\\\" AND date >= CURRENT_DATE - INTERVAL \\\"1 week\\\"\",\n    \"cache_key\": \"SELECT:deployment_data:frontend:*:weeks:1:*\",\n    \"confirm_cache\": true,\n    \"user_id\": \"test_user\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseURL}}/execute",
+          "host": [
+            "{{baseURL}}"
+          ],
+          "path": [
+            "execute"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseURL",
+      "value": ""
+    }
+  ]
+}
