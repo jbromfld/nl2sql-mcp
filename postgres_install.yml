@@ -1,0 +1,144 @@
+---
+- name: Install and configure PostgreSQL and pgAdmin on macOS (Apple M1)
+  hosts: localhost
+  gather_facts: no
+  vars:
+    postgres_version: "18"
+    pg_data_dir: "/opt/homebrew/var/postgresql@{{ postgres_version }}/main"
+
+  tasks:
+    - name: Load PostgreSQL variables from .env.ini
+      set_fact:
+        pg_user: "{{ lookup('ansible.builtin.ini', 'PG_USER section=default file=.env.ini') }}"
+        pg_password: "{{ lookup('ansible.builtin.ini', 'PG_PASSWORD section=default file=.env.ini') }}"
+        pg_db: "{{ lookup('ansible.builtin.ini', 'PG_DB section=default file=.env.ini') }}"
+
+    - name: Check if Homebrew is installed
+      stat:
+        path: /opt/homebrew/bin/brew
+      register: brew_path
+
+    - name: Install Homebrew for Apple Silicon if missing
+      shell: |
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      when: not brew_path.stat.exists
+
+    - name: Add Homebrew to PATH
+      shell: echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+      when: not brew_path.stat.exists
+
+    - name: Add PostgreSQL to PATH
+      shell: echo 'export PATH="/opt/homebrew/opt/postgresql@{{ postgres_version }}/bin:$PATH"' >> ~/.zprofile
+      changed_when: false
+
+    - name: Ensure Homebrew is up to date
+      shell: /opt/homebrew/bin/brew update
+      changed_when: false
+      ignore_errors: true
+
+    - name: Remove old PostgreSQL versions (if upgrading)
+      shell: |
+        /opt/homebrew/bin/brew uninstall -f postgresql postgresql@* --ignore-dependencies 2>/dev/null || true
+      changed_when: false
+      ignore_errors: true
+
+    - name: Install or upgrade PostgreSQL
+      homebrew:
+        name: postgresql@{{ postgres_version }}
+        state: latest
+
+    - name: Ensure pgAdmin4 is installed and up-to-date
+      shell: |
+        /opt/homebrew/bin/brew install --cask pgadmin4 || /opt/homebrew/bin/brew upgrade --cask pgadmin4
+      args:
+        creates: /Applications/pgAdmin\ 4.app
+
+    - name: Check if PostgreSQL data directory exists
+      stat:
+        path: "{{ pg_data_dir }}"
+      register: pgdata
+
+    - name: Initialize PostgreSQL database cluster if needed
+      shell: |
+        /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/initdb -D "{{ pg_data_dir }}"
+      when: not pgdata.stat.exists
+
+    - name: Ensure PostgreSQL service is started
+      shell: |
+        brew services start postgresql@{{ postgres_version }}
+      register: pg_service_start
+      failed_when: false
+
+    - name: Wait for PostgreSQL to be available
+      shell: |
+        until /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/pg_isready -h localhost -p 5432 -h localhost -p 5432 >/dev/null 2>&1; do
+          echo "Waiting for PostgreSQL to start..."
+          sleep 2
+        done
+      retries: 10
+      delay: 3
+      register: pg_ready
+      ignore_errors: true
+
+    - name: Ensure 'postgres' role exists
+      shell: |
+        /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/psql --username=postgres --dbname=postgres -c "SELECT 1 FROM pg_roles WHERE rolname='postgres';" | grep -q 1 || /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/createuser -s postgres
+      changed_when: false
+
+    - name: Create PostgreSQL user (if not exists)
+      shell: |
+        /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/psql -v ON_ERROR_STOP=1 --username=postgres --dbname=postgres --tuples-only --quiet -c "SELECT 1 FROM pg_roles WHERE rolname='{{ pg_user }}';" | grep -q 1 || /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/createuser {{ pg_user }}
+      changed_when: false
+
+    - name: Ensure 'postgres' role exists
+      shell: |
+        /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/psql --username=postgres --dbname=postgres -c "SELECT 1 FROM pg_roles WHERE rolname='postgres';" | grep -q 1 || /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/createuser -s postgres
+      changed_when: false
+
+    - name: Set password for PostgreSQL user
+      shell: |
+        /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/psql --username=postgres --dbname=postgres -c "ALTER USER {{ pg_user }} WITH PASSWORD '{{ pg_password }};'"
+      changed_when: false
+
+    - name: Create PostgreSQL database (if not exists)
+      shell: |
+        /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/psql -v ON_ERROR_STOP=1 --username=postgres --dbname=postgres --tuples-only --quiet -c "SELECT 1 FROM pg_database WHERE datname='{{ pg_db }}';" | grep -q 1 || /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/createdb -O {{ pg_user }} {{ pg_db }}
+      changed_when: false
+
+    - name: Install pgvector extension via Homebrew
+      shell: |
+        set -e
+        /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/pg_config --version
+        rm -rf pgvector || true
+        git clone https://github.com/pgvector/pgvector.git
+        cd pgvector
+        make PG_CONFIG=/opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/pg_config
+        make install PG_CONFIG=/opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/pg_config
+
+    - name: Enable pgvector extension in database
+      shell: |
+        /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/psql --username={{ pg_user }} --dbname={{ pg_db }} -c "CREATE EXTENSION IF NOT EXISTS vector;"
+      changed_when: false
+
+    - name: Locate installed vector.control files
+      shell: |
+        find /opt/homebrew -type f -name vector.control 2>/dev/null || true
+      register: vector_control_files
+      changed_when: false
+
+    - name: Show vector.control locations (if any)
+      debug:
+        msg: "vector.control files: {{ vector_control_files.stdout_lines }}"
+
+    - name: Print PostgreSQL version
+      shell: /opt/homebrew/opt/postgresql@{{ postgres_version }}/bin/psql --version
+      register: psql_version
+      changed_when: false
+
+    - name: Show PostgreSQL version
+      debug:
+        msg: "{{ psql_version.stdout }}"
+
+    - name: Show created user and database info
+      debug:
+        msg: "PostgreSQL user '{{ pg_user }}' with database '{{ pg_db }}' created (or already exists)."
