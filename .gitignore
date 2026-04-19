@@ -13,3 +13,4 @@ test*.*
 .cursor/
 
 .env
+.DS_Store
